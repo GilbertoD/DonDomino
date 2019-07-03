@@ -4,17 +4,19 @@ from copy import deepcopy as dpc
 import definitions as defs
 import numpy as np
 
+
+
 DEBUG = False
 
 class Juego :
 
-    def __init__(self, nMax:int, nJug:int) :
+    def __init__(self, nMax:int, nJug:int,prueba:bool) :
         self.nMax = nMax
         assert self.cantFichas() % nJug == 0, "No se pueden repartir las fichas!!!"
         self.nJug = nJug
 
         nFichas = int(self.cantFichas()/nJug)
-        types = ['random','random','random','random']
+        types = ['no random','random','random','random']
         self.jugadores = [ Jugador( i, nFichas, nMax, types[i] ) for i in range(nJug) ]
 
         self.tablero = []
@@ -22,6 +24,7 @@ class Juego :
 
         cantFichas = self.cantFichas()
         self.policy = defs.Policy( cantFichas*nJug + nMax + 1, 2*cantFichas + 1 )
+        self.prueba = prueba
 
     def cantFichas(self) -> int:
         n = self.nMax
@@ -97,12 +100,16 @@ class Juego :
         for jugador in self.jugadores : 
             states.extend( jugador.states )
             actions.extend( jugador.actions )
-        
-        if len(states) > 0 : 
+        actions =np.array(actions)
+        if not  self.prueba: 
             self.policy.update_policy_supervised( np.array(states,dtype=np.float32), np.array(actions) )
+        '''if len(self.policy.loss_history)>1000 and self.policy.loss_history[-1]>self.policy.loss_history[-100]:
+            self.policy.saveModel("supervisado_mejorado")
+            raise Exception("La funcion de error dejó de mejorar")
+    '''
 
         if DEBUG and nPas < self.nJug: print(f'Se acabó el Juego, ganó {idx:d}!!!')
-        if DEBUG and nPas == self.nJug: print('Se cerró el Juego :(')
+        if DEBUG and nPas == self.nJug: print('Se cerró el Juego :(:V')
 
         return self.policy.loss_history
         
@@ -112,6 +119,12 @@ class Jugador :
         self.id = id
         self.fichas = []
         self.nMax = nMax
+        self.jugadas_mano=0
+        self.jugada_NM=0
+        self.jugadas_salto=0
+        
+        self.jugadas_buenas=0
+        self.jugadas_totales=0
         
         self.typeAgent = typeAgent
 
@@ -203,6 +216,33 @@ class Jugador :
             # state = torch.tensor( state, dtype=torch.float )
             # state = state.reshape( [-1,1] )
             self.states.append( state )
+            #print(juego.policy.state_space)
+            state = np.array(state,dtype=np.float32).reshape((1,len(state)))
+            
+            action_policy = np.argmax(juego.policy.model(state))
+            if action_policy == 2*juego.cantFichas() and ficha is None:
+                self.jugadas_buenas+=1
+                self.jugadas_salto+=1
+
+            
+            lado = action_policy //juego.cantFichas()
+            fic = np.zeros( juego.cantFichas() )
+            fic[ action_policy%juego.cantFichas() ] = 1
+            ficha_policy = encoder_to_fichas.decode( fic )[0]
+            if nJug1 in ficha_policy or nJug2 in ficha_policy :
+                self.jugada_NM+=1
+          
+
+            tengo = False
+            for ff in self.fichas:
+                tengo = ff == ficha_policy
+                if tengo : break
+            if tengo:
+                self.jugadas_mano+=1
+                if lado==0 and nJug1 in  ficha_policy:self.jugadas_buenas+=1
+                if lado==1 and nJug2 in  ficha_policy:self.jugadas_buenas+=1
+
+            self.jugadas_totales+=1
 
             return tablero, ficha, len( self.fichas ) == 0, ficha is None
 
@@ -216,10 +256,10 @@ class Jugador :
             state = np.array( state )
 
             # Evaluar Estado
-            # state = juego.policy( Variable( torch.tensor( state, dtype=torch.float ) ) )
+            state = juego.policy( Variable( torch.tensor( state, dtype=torch.float ) ) )
 
-            # c = Categorical(state)
-            # action = torch.tensor( [ c.sample().item() ], dtype=torch.int )
+            c = Categorical(state)
+            action = torch.tensor( [ c.sample().item() ], dtype=torch.int )
 
             lado = action // 28
             fic = np.zeros( 28 )

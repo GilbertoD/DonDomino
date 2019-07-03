@@ -31,7 +31,10 @@ def update_policy( policy, optimizer ):
     optimizer.step()
 
     # Save and intialize episode history counters
-    policy.loss_history.append(loss.item())
+    f=open("loss.txt","a")
+    f.write(loss.item())
+    f.close()
+    
     policy.reward_history.append(np.sum(policy.reward_episode))
     policy.policy_history = Variable(torch.Tensor())
     policy.reward_episode = []
@@ -54,10 +57,11 @@ class Policy :
 
         self.global_step = tf.Variable(0)
         self.loss_avg = tfe.metrics.Mean()
+        self.accuracy = tfe.metrics.Accuracy()
 
         self.model = keras.Sequential( [ 
-            keras.layers.Dense( 128, activation=tf.nn.relu, use_bias=False, input_shape=( self.state_space, ) ),
-            keras.layers.Dense( 64, activation=tf.nn.relu, use_bias=False ),
+            keras.layers.Dense( 128, activation=tf.nn.relu, use_bias=True, input_shape=( self.state_space, ) ),
+            keras.layers.Dense( 64, activation=tf.nn.relu, use_bias=True ),
             keras.layers.Dropout( rate=0.6 ),
             keras.layers.Dense( self.action_space, activation=tf.nn.softmax )
         ] )
@@ -65,7 +69,7 @@ class Policy :
 
         if load_name is not None : self.model = keras.models.load_model( load_name )
 
-        self.optimizer = tf.train.AdamOptimizer( )
+        self.optimizer = tf.train.AdamOptimizer()
 
         self.device = "CPU:0"
         gpus = getGPUs( )
@@ -78,10 +82,13 @@ class Policy :
         # Overall reward and loss history
         # self.reward_history = []
         self.loss_history = []
+    def load_Model(self,load_name=None):
+        self.model = keras.models.load_model( load_name )
+
 
     def update_policy_supervised( self, states, actions ) :
 
-        epochs = 5
+        epochs = 100
         for e in range(epochs) :
             with tf.device( self.device ) :
                 with tf.GradientTape() as tape:
@@ -92,9 +99,12 @@ class Policy :
 
                 self.optimizer.apply_gradients( zip( grads, self.model.trainable_variables ), self.global_step )
             
-            self.loss_history.append( loss.numpy() )
-
-            print( f'\tEpoch {e+1:d}/{epochs}... | Loss: {loss:.3f}' )   
+            f=open("loss.txt","a")
+            f.write(loss.item()))
+            f.close()
+            
+            self.accuracy( tf.argmax( self.model( states ), axis=1, output_type=tf.int32 ), actions.reshape( len(actions) ) )
+            print( f'\tEpoch {e+1:d}/{epochs}... | Loss: {loss:.3f} | Acc: {self.accuracy.result():.3f}' )   
 
     def saveModel( self, name ) :
         self.model.save('models/' + name + '.h5')
