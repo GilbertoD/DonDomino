@@ -60,11 +60,12 @@ class Policy :
         self.accuracy = tfe.metrics.Accuracy()
 
         self.model = keras.Sequential( [ 
-            keras.layers.Dense( 128, activation=tf.nn.relu, use_bias=True, input_shape=( self.state_space, ) ),
-            keras.layers.Dense( 64, activation=tf.nn.relu, use_bias=True ),
+            keras.layers.Dense(512,activation=tf.nn.relu,use_bias=False,input_shape=(self.state_space,)),
+            keras.layers.Dense(256,activation=tf.nn.relu,use_bias=False),
+            keras.layers.Dense( 128, activation=tf.nn.relu, use_bias=False),
+            keras.layers.Dense( 64, activation=tf.nn.relu, use_bias=False),
             keras.layers.Dropout( rate=0.6 ),
-            keras.layers.Dense( self.action_space, activation=tf.nn.softmax )
-        ] )
+            keras.layers.Dense( self.action_space, activation=tf.nn.softmax )])
         self.model.summary()
 
         if load_name is not None : self.model = keras.models.load_model( load_name )
@@ -89,6 +90,7 @@ class Policy :
     def update_policy_supervised( self, states, actions ) :
 
         epochs = 100
+        f=open("loss.txt","a")
         for e in range(epochs) :
             with tf.device( self.device ) :
                 with tf.GradientTape() as tape:
@@ -99,12 +101,11 @@ class Policy :
 
                 self.optimizer.apply_gradients( zip( grads, self.model.trainable_variables ), self.global_step )
             
-            f=open("loss.txt","a")
-            f.write(loss.item()))
-            f.close()
-            
+           
+            f.write(str(loss.numpy())+"\n")
             self.accuracy( tf.argmax( self.model( states ), axis=1, output_type=tf.int32 ), actions.reshape( len(actions) ) )
             print( f'\tEpoch {e+1:d}/{epochs}... | Loss: {loss:.3f} | Acc: {self.accuracy.result():.3f}' )   
+        f.close()
 
     def saveModel( self, name ) :
         self.model.save('models/' + name + '.h5')

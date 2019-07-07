@@ -122,6 +122,7 @@ class Jugador :
         self.jugadas_mano=0
         self.jugada_NM=0
         self.jugadas_salto=0
+        self. jugada_NM_lado_malo=0
         
         self.jugadas_buenas=0
         self.jugadas_totales=0
@@ -224,23 +225,28 @@ class Jugador :
                 self.jugadas_buenas+=1
                 self.jugadas_salto+=1
 
-            
+            f=open("jugadas.txt","a")
+            f.write(str(action_policy)+"\n")
+            f.close
             lado = action_policy //juego.cantFichas()
             fic = np.zeros( juego.cantFichas() )
             fic[ action_policy%juego.cantFichas() ] = 1
             ficha_policy = encoder_to_fichas.decode( fic )[0]
-            if nJug1 in ficha_policy or nJug2 in ficha_policy :
-                self.jugada_NM+=1
+           
           
 
             tengo = False
             for ff in self.fichas:
                 tengo = ff == ficha_policy
                 if tengo : break
+            if not tengo and (nJug1 in ficha_policy or nJug2 in ficha_policy) :
+                self.jugada_NM+=1
             if tengo:
-                self.jugadas_mano+=1
+                
                 if lado==0 and nJug1 in  ficha_policy:self.jugadas_buenas+=1
                 if lado==1 and nJug2 in  ficha_policy:self.jugadas_buenas+=1
+                else:
+                    self.jugadas_mano+=1
 
             self.jugadas_totales+=1
 
