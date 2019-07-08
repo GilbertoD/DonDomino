@@ -186,15 +186,28 @@ class Jugador :
         idx1, idx2 = False, False
 
         # Ficha a poner
-        ficha = None  
-
+        ficha = None
+        #Fichas validas que se utilizaráen e entrenamieo  
+        validas=np.zeros((57,))
         ## Random Player
         if True : 
 
             for f in self.fichas:
-                if nJug1 in f : ficha, idx1 = f, True
-                if nJug2 in f : ficha, idx2 = f, True
+                if nJug1 in f :
+                    ficha, idx1 = f, True
+                if nJug2 in f :
+                    ficha, idx2 = f, True
                 if idx1 or idx2: break
+            for f in self.fichas:
+                if nJug1 in f :
+                    cosa = np.array( encoder_to_fichas.encode( [f] )+ [0]*28+[0])
+                
+                    validas+= cosa
+                if nJug2 in f :
+                    cosa = np.array( [0]*28+encoder_to_fichas.encode( [f] )+[0])
+                    
+                    validas+= cosa
+
 
             if ficha is not None:
                 self.fichas.remove( ficha )
@@ -206,8 +219,10 @@ class Jugador :
                     else : tablero = tablero + [ficha.inv()] 
 
             action = -1                     
-            if ficha is None : action = [ 2*juego.cantFichas() ]
-            else : action = [ np.argmax(encoder_to_fichas.encode( [ficha] ) ) ]
+            if ficha is None : #action = +[ 2*juego.cantFichas() ]
+                action=[0]*56+[1]
+            else : #action = [ np.argmax(encoder_to_fichas.encode( [ficha] ) ) ]
+                action=validas
             self.actions.append( action )
 
             state = []

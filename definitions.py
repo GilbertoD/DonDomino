@@ -95,7 +95,7 @@ class Policy :
             with tf.device( self.device ) :
                 with tf.GradientTape() as tape:
                     actions_ = self.model( states )
-                    loss = tf.losses.sparse_softmax_cross_entropy( labels=actions, logits=actions_ )
+                    loss = tf.losses.softmax_cross_entropy( onehot_labels=actions, logits=actions_ )
                     grads = tape.gradient( loss, self.model.trainable_variables )
                 del tape 
 

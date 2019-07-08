@@ -1,15 +1,16 @@
-from domino import *
-import definitions
 import matplotlib.pyplot as plt
-'''
-EPISODES = 3000
+
+import definitions
+from domino import *
+
+EPISODES = 1000
 
 juego = Juego(6,4,False)
 
 E = []
 R = []
 loss = []
-#juego.policy.load_Model( 'models/supervisado_mejorado.h5' )
+#juego.policy.load_Model( 'models/supervisado_1.h5' )
 open("loss.txt","w").close()
 open("jugadas.txt","w").close()
 
@@ -39,7 +40,7 @@ print( f'Hizo {total_buenas:d} buenas jugadas de {total_total:d} jugadas totales
 
 
 
-
+'''
 plt.figure()
 plt.scatter( E, R )
 plt.xlabel("Episodes")
