@@ -235,7 +235,7 @@ class Jugador :
             #print(juego.policy.state_space)
             state = np.array(state,dtype=np.float32).reshape((1,len(state)))
             
-            action_policy = np.argmax(juego.policy.model(state))
+            action_policy = np.argmax(juego.policy.model([state[:-14],state[-14:]]))
             if action_policy == 2*juego.cantFichas() and ficha is None:
                 self.jugadas_buenas+=1
                 self.jugadas_salto+=1

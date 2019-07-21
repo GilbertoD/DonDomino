@@ -1,8 +1,7 @@
 import matplotlib.pyplot as plt
-
-import definitions
+from definitions import *
 from domino import *
-
+tf.enable_eager_execution()
 EPISODES = 1000
 
 juego = Juego(6,4,False)
@@ -10,7 +9,7 @@ juego = Juego(6,4,False)
 E = []
 R = []
 loss = []
-#juego.policy.load_Model( 'models/supervisado_1.h5' )
+juego.policy.load_Model( 'models/supervisado_1.h5' )
 open("loss.txt","w").close()
 open("jugadas.txt","w").close()
 

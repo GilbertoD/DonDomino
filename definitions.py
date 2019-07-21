@@ -47,7 +47,7 @@ def getGPUs():
 class Policy :
 
     def __init__( self, dim_state, dim_action, gamma=0.9, load_name=None ) :
-        tf.enable_eager_execution()
+
         tf.logging.set_verbosity(tf.logging.ERROR)
 
         self.state_space = dim_state
@@ -59,14 +59,27 @@ class Policy :
         self.loss_avg = tfe.metrics.Mean()
         self.accuracy = tfe.metrics.Accuracy()
 
-        self.model = keras.Sequential( [ 
-            keras.layers.Dense(512,activation=tf.nn.relu,use_bias=False,input_shape=(self.state_space,)),
-            keras.layers.Dense(256,activation=tf.nn.relu,use_bias=False),
-            keras.layers.Dense( 128, activation=tf.nn.relu, use_bias=False),
-            keras.layers.Dense( 64, activation=tf.nn.relu, use_bias=False),
-            keras.layers.Dropout( rate=0.6 ),
-            keras.layers.Dense( self.action_space, activation=tf.nn.softmax )])
-        self.model.summary()
+        Input1 = keras.Input(shape=(self.state_space,),name="fichas")
+        Input2 = keras.Input(shape=(self.state_space,),name="numeros")
+        x1 = keras.layers.Dense(512,activation=tf.nn.relu,use_bias=False)(Input1)
+        x2 = keras.layers.Dense(512,activation=tf.nn.relu,use_bias=False)(Input2)
+        x1 = keras.layers.Dense(256,activation=tf.nn.relu,use_bias=False)(x1)
+        x2 = keras.layers.Dense(256,activation=tf.nn.relu,use_bias=False)(x2)
+        x = tf.concat([x1,x2],axis=0)
+        x = keras.layers.Dense(64, activation=tf.nn.relu, use_bias=False)(x)
+        x = keras.layers.Dropout(rate=0.6)(x)
+        output = keras.layers.Dense(self.action_space, activation=tf.nn.softmax)(x)
+        self.model =  keras.Model(inputs=[Input1,Input2], outputs=output, name='Agente')
+
+
+        # self.model = keras.Sequential( [
+        #     keras.layers.Dense(512,activation=tf.nn.relu,use_bias=False,input_shape=(self.state_space,)),
+        #     keras.layers.Dense(256,activation=tf.nn.relu,use_bias=False),
+        #     keras.layers.Dense( 128, activation=tf.nn.relu, use_bias=False,input_shape=(self.state_space,)),
+        #     keras.layers.Dense( 64, activation=tf.nn.relu, use_bias=False),
+        #     keras.layers.Dropout( rate=0.6 ),
+        #     keras.layers.Dense( self.action_space, activation=tf.nn.softmax )])
+        # self.model.summary()
 
         if load_name is not None : self.model = keras.models.load_model( load_name )
 
