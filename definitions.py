@@ -55,21 +55,21 @@ class Policy :
 
         self.gamma = gamma
 
-        self.global_step = tf.Variable(0)
+        self.global_step = tfe.Variable(0)
         self.loss_avg = tfe.metrics.Mean()
         self.accuracy = tfe.metrics.Accuracy()
 
-        Input1 = keras.Input(shape=(self.state_space,),name="fichas")
-        Input2 = keras.Input(shape=(self.state_space,),name="numeros")
+        Input1 = keras.Input(shape=(self.state_space-14,),name="fichas")
+        Input2 = keras.Input(shape=(14,),name="numeros")
         x1 = keras.layers.Dense(512,activation=tf.nn.relu,use_bias=False)(Input1)
         x2 = keras.layers.Dense(512,activation=tf.nn.relu,use_bias=False)(Input2)
         x1 = keras.layers.Dense(256,activation=tf.nn.relu,use_bias=False)(x1)
         x2 = keras.layers.Dense(256,activation=tf.nn.relu,use_bias=False)(x2)
-        x = tf.concat([x1,x2],axis=0)
+        x = keras.layers.concatenate([x1,x2],axis=-1)
         x = keras.layers.Dense(64, activation=tf.nn.relu, use_bias=False)(x)
         x = keras.layers.Dropout(rate=0.6)(x)
-        output = keras.layers.Dense(self.action_space, activation=tf.nn.softmax)(x)
-        self.model =  keras.Model(inputs=[Input1,Input2], outputs=output, name='Agente')
+        output = keras.layers.Dense(self.action_space, activation="softmax")(x)
+        self.model = keras.Model(inputs=[Input1,Input2], outputs=output)
 
 
         # self.model = keras.Sequential( [
@@ -79,7 +79,7 @@ class Policy :
         #     keras.layers.Dense( 64, activation=tf.nn.relu, use_bias=False),
         #     keras.layers.Dropout( rate=0.6 ),
         #     keras.layers.Dense( self.action_space, activation=tf.nn.softmax )])
-        # self.model.summary()
+        self.model.summary()
 
         if load_name is not None : self.model = keras.models.load_model( load_name )
 
@@ -101,22 +101,28 @@ class Policy :
 
 
     def update_policy_supervised( self, states, actions ) :
-
+        states = np.array(states)
         epochs = 100
         f=open("loss.txt","a")
         for e in range(epochs) :
             with tf.device( self.device ) :
                 with tf.GradientTape() as tape:
-                    actions_ = self.model( states )
-                    loss = tf.losses.softmax_cross_entropy( onehot_labels=actions, logits=actions_ )
-                    grads = tape.gradient( loss, self.model.trainable_variables )
-                del tape 
-
+                    actions_ = self.model( [states[:,:-14],states[:,-14:] ])
+                    # actions = tf.multiply(actions,1/np.sum(actions,axis=1,dtype=np.float).reshape(-1,1))
+                    loss = tf.losses.softmax_cross_entropy( onehot_labels=tf.multiply(actions,1/np.sum(actions,axis=1,dtype=np.float).reshape(-1,1)), logits=actions_ )
+                grads = tape.gradient( loss, self.model.trainable_variables )
+                # del tape
+                del tape
                 self.optimizer.apply_gradients( zip( grads, self.model.trainable_variables ), self.global_step )
-            
+            logits=[]
+            for elem in actions_:
+                coso = np.zeros((1,57))
+                ordenados = np.argsort(elem)
+                coso[0,ordenados[:3]] = 1
+                logits.append(coso)
            
             f.write(str(loss.numpy())+"\n")
-            self.accuracy( tf.argmax( self.model( states ), axis=1, output_type=tf.int32 ), actions.reshape( len(actions) ) )
+            self.accuracy(  coso,actions)
             print( f'\tEpoch {e+1:d}/{epochs}... | Loss: {loss:.3f} | Acc: {self.accuracy.result():.3f}' )   
         f.close()
 
