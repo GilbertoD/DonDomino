@@ -99,7 +99,7 @@ class Juego :
         states, actions = [], []
         for jugador in self.jugadores : 
             states.extend( jugador.states )
-            actions.extend( jugador.actions )
+            actions.extend( jugador.actions)
         actions =np.array(actions)
         if not  self.prueba: 
             self.policy.update_policy_supervised( np.array(states,dtype=np.float32), np.array(actions) )
@@ -119,13 +119,14 @@ class Jugador :
         self.id = id
         self.fichas = []
         self.nMax = nMax
-        self.jugadas_mano=0
-        self.jugada_NM=0
-        self.jugadas_salto=0
-        self. jugada_NM_lado_malo=0
+        self.jugadas_mano = 0
+        self.jugada_NM = 0
+        self.jugadas_salto = 0
+        self. jugada_NM_lado_malo = 0
         
-        self.jugadas_buenas=0
-        self.jugadas_totales=0
+        self.jugadas_buenas = 0
+        self.jugadas_totales = 0
+        self. jugadas_salto_total = 0
         
         self.typeAgent = typeAgent
 
@@ -222,24 +223,25 @@ class Jugador :
             if ficha is None : #action = +[ 2*juego.cantFichas() ]
                 action=[0]*56+[1]
             else : #action = [ np.argmax(encoder_to_fichas.encode( [ficha] ) ) ]
-                action=validas
+                action = validas
+                action=action/sum(action)
             self.actions.append( action )
 
             state = []
             for f in fichas: state.extend( encoder_to_fichas.encode( f ) )
             state.extend( encoder_number.encode( [nJug1, nJug2] ) )
             state = np.array( state )
-            # state = torch.tensor( state, dtype=torch.float )
-            # state = state.reshape( [-1,1] )
+
             self.states.append( state )
-            #print(juego.policy.state_space)
+
             state = np.array(state,dtype=np.float32).reshape((1,len(state)))
             
             action_policy = np.argmax(juego.policy.model([state[0,:-14].reshape(1,105),state[0,-14:].reshape(1,14)]))
             if action_policy == 2*juego.cantFichas() and ficha is None:
                 self.jugadas_buenas+=1
                 self.jugadas_salto+=1
-
+            if action_policy ==2*juego.cantFichas():
+                self.jugadas_salto_total+=1
             f=open("jugadas.txt","a")
             f.write(str(action_policy)+"\n")
             f.close

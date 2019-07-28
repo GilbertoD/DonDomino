@@ -57,7 +57,7 @@ class Policy :
 
         self.global_step = tfe.Variable(0)
         self.loss_avg = tfe.metrics.Mean()
-        self.accuracy = tfe.metrics.Accuracy()
+        self.accuracy = tfe.metrics.precision()
 
         Input1 = keras.Input(shape=(self.state_space-14,),name="fichas")
         Input2 = keras.Input(shape=(14,),name="numeros")
@@ -122,7 +122,7 @@ class Policy :
                 logits.append(coso)
            
             f.write(str(loss.numpy())+"\n")
-            self.accuracy(  coso,actions)
+            self.accuracy(coso,actions)
             print( f'\tEpoch {e+1:d}/{epochs}... | Loss: {loss:.3f} | Acc: {self.accuracy.result():.3f}' )   
         f.close()
 
