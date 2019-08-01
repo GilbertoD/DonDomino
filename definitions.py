@@ -57,7 +57,7 @@ class Policy :
 
         self.global_step = tfe.Variable(0)
         self.loss_avg = tfe.metrics.Mean()
-        self.accuracy = tfe.metrics.precision()
+        # self.accuracy = tfe.metrics.precision()
 
         Input1 = keras.Input(shape=(self.state_space-14,),name="fichas")
         Input2 = keras.Input(shape=(14,),name="numeros")
@@ -114,16 +114,16 @@ class Policy :
                 # del tape
                 del tape
                 self.optimizer.apply_gradients( zip( grads, self.model.trainable_variables ), self.global_step )
-            logits=[]
-            for elem in actions_:
-                coso = np.zeros((1,57))
-                ordenados = np.argsort(elem)
-                coso[0,ordenados[:3]] = 1
-                logits.append(coso)
-           
+            # logits=[]
+            # for elem in actions_:
+            #     coso = np.zeros((1,57))
+            #     ordenados = np.argsort(elem)
+            #     coso[0,ordenados[:3]] = 1
+            #     logits.append(coso)
+            #
             f.write(str(loss.numpy())+"\n")
-            self.accuracy(coso,actions)
-            print( f'\tEpoch {e+1:d}/{epochs}... | Loss: {loss:.3f} | Acc: {self.accuracy.result():.3f}' )   
+            # self.accuracy(coso,actions)
+            print( f'\tEpoch {e+1:d}/{epochs}... | Loss: {loss:.3f}' )
         f.close()
 
     def saveModel( self, name ) :

@@ -6,7 +6,7 @@ import numpy as np
 
 
 
-DEBUG = False
+DEBUG = True
 
 class Juego :
 
@@ -249,19 +249,21 @@ class Jugador :
             fic = np.zeros( juego.cantFichas() )
             fic[ action_policy%juego.cantFichas() ] = 1
             ficha_policy = encoder_to_fichas.decode( fic )[0]
-           
+            if DEBUG:
+                print(f"El jugador {self.id:d} jugaria segun la policy la ficha "+str(ficha_policy)+f" por el lado {lado:d} y la acción es {action_policy:d}"+"\n y esta eran las fichas válidas\n")
+
           
 
             tengo = False
             for ff in self.fichas:
                 tengo = ff == ficha_policy
                 if tengo : break
-            if not tengo and (nJug1 in ficha_policy or nJug2 in ficha_policy) :
+            if not tengo and (nJug1 in ficha_policy or nJug2 in ficha_policy):
                 self.jugada_NM+=1
             if tengo:
                 
-                if lado==0 and nJug1 in  ficha_policy:self.jugadas_buenas+=1
-                if lado==1 and nJug2 in  ficha_policy:self.jugadas_buenas+=1
+                if lado == 0 and nJug1 in ficha_policy: self.jugadas_buenas+=1
+                if lado == 1 and nJug2 in ficha_policy: self.jugadas_buenas+=1
                 else:
                     self.jugadas_mano+=1
 
