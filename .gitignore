@@ -1,2 +1,6 @@
-__pycache__
+# Ignore caches of VSCode
+__pycache__/
 .vscode
+
+# Ignore LOG Files
+*.log
