@@ -2,6 +2,10 @@ from itertools import combinations
 import random as rnd
 from copy import deepcopy as dpc
 from trueskill import Rating, rate
+from enum import Enum
+import numpy as np
+import tensorflow as tf
+from supervised_model.Main_supervisado import build_model
 
 DEBUG = False
 
@@ -34,6 +38,17 @@ class Bone :
         self.n1, self.n2 = self.n2, self.n1
         return self
 
+    def sum(self):
+        return self.n1 + self.n2
+
+class PlayerType(Enum) :
+    RANDOM = 0
+    IMITATION = 1
+
+    def __str__(self):
+        if self == PlayerType.RANDOM : return 'Random Player'
+        if self == PlayerType.IMITATION: return 'Imitation Bot Player'
+
 class Player:
     def __init__(self, id: int, nMax: int, nTotalBones: int, typeAgent):
         self.id = id
@@ -45,7 +60,7 @@ class Player:
         self.nMax = nMax
         self.nTotal = nTotalBones
 
-        self.typeAgent = typeAgent
+        self.typeAgent = PlayerType(typeAgent)
 
         self.board = []
         ZEROS = lambda : [0]*self.nTotal
@@ -58,6 +73,9 @@ class Player:
         self.state.extend( ZEROS() )
         self.state.extend( plays )
 
+        self.model = build_model((91, 1,),type="fc")
+        self.model.load_weights("./models/DOMINATOR_e31-val_loss_2.2780.hdf5")
+
 
     def __str__(self):
         s = f'Player {self.id:d}:\n\t'
@@ -66,7 +84,7 @@ class Player:
         return s
 
     def printMMR(self):
-        return f'Player {self.id:d}: ' + str( self.MMR )
+        return f'Player {self.id:d} ({str(self.typeAgent)}): ' + str( self.MMR )
 
     def playerId(self, otherID:int ):
         tempID = otherID - self.id
@@ -110,6 +128,10 @@ class Player:
         self.bones.append( bone )
         self.initialBones.append(bone)
 
+    def play(self, board):
+        if self.typeAgent == PlayerType.RANDOM :  return self.playRandom(board)
+        if self.typeAgent == PlayerType.IMITATION:  return self.playImitation(board)
+
     def playRandom(self, board):
         if not board :
             bone = Bone( self.nMax, self.nMax )
@@ -141,6 +163,47 @@ class Player:
 
         return board, bone, len(self.bones) == 0, bone is None
 
+    def playImitation(self,board):
+        if not board :
+            bone = Bone( self.nMax, self.nMax )
+            self.bones.remove(bone)
+            board.append(bone)
+            return board, bone, len(self.bones) == 0, bone is None
+
+        n1, n2 = board[0].n1, board[-1].n2
+
+        observation = np.array( (self.state) )
+        observation = observation.reshape(1,91,1)
+        output = self.model.predict(observation)
+        output = output.reshape(7, 7)
+
+        # Mask
+        mask1 = np.zeros((7,7), dtype = int)
+        for b in self.bones :
+            mask1[b.n1, b.n2] = 1
+            mask1[b.n2, b.n1] = 1
+
+        mask2 = np.zeros((7,7), dtype = int)
+        for i in range(self.nMax+1) :
+            mask2[n1, i] = 1
+            mask2[n2, i] = 1
+
+        output = output * mask1 * mask2
+        maxV = np.amax( output )
+        idxMax = np.where( output == maxV )
+        idxMax = list(zip(idxMax[0],idxMax[1]))[0]
+
+        if maxV == 0 :
+            bone = None
+        else :
+            bone = Bone( idxMax[0], idxMax[1] )
+            self.bones.remove(bone)
+            if idxMax[0] == n1 : board = [bone.inv()] + board
+            else : board = board + [bone]
+
+        return board, bone, len(self.bones) == 0, bone is None
+
+
 class Game:
     def __init__(self, nMax: int, nJug: int):
         self.nMax = nMax
@@ -149,7 +212,7 @@ class Game:
         self.nJug = nJug
 
         nBones = int(self.nTotalBones() / nJug)
-        types = ['random', 'random', 'random', 'random']
+        types = [1,0,0,0]
         self.players = [ Player(i, nMax, self.totalBones, types[i]) for i in range(nJug) ]
 
         self.board = []
@@ -201,15 +264,15 @@ class Game:
 
         while not ended :
             # board, bone, len(self.bones) == 0, bone is None
-            self.board, bone, ended, playerPass = self.players[idx].playRandom( self.board )
+            self.board, bone, ended, playerPass = self.players[idx].play( self.board )
 
             move = 'x' if playerPass else bone
             for p in self.players : p.update( self.board, idx, move )
 
-            if playerPass: nPas += 1
-            else: nPas = 0
+            if playerPass: nPass += 1
+            else: nPass = 0
 
-            if nPas == self.nJug: ended = True
+            if nPass == self.nJug: ended = True
 
             if DEBUG:
                 if playerPass : print(f'Turn {k:d}: The Player {idx:d} pass')
@@ -223,22 +286,47 @@ class Game:
             idx %= self.nJug
 
         idx = (idx - 1) % self.nJug
+        locked = True
+        if nPass < self.nJug :
+            print(f'\tPlayer {idx:d} wins!!!!')
 
-        rates = [ [self.players[0].MMR], [self.players[1].MMR], [self.players[2].MMR], [self.players[3].MMR] ]
-        ranks = [1]*4
-        ranks[idx] =0
+            locked = False
+        else :
+            s0 = np.sum([b.sum() for b in self.players[0].bones])
+            s1 = np.sum([b.sum() for b in self.players[1].bones])
+            s2 = np.sum([b.sum() for b in self.players[2].bones])
+            s3 = np.sum([b.sum() for b in self.players[3].bones])
+            idx = np.argmin( [s0,s1,s2,s3] )
 
-        (r1,), (r2,), (r3,), (r4,) = rate( rates, ranks=ranks )
+            locked = True
 
-        self.players[0].MMR = dpc( r1 )
-        self.players[1].MMR = dpc( r2 )
-        self.players[2].MMR = dpc( r3 )
-        self.players[3].MMR = dpc( r4 )
+            print( f'\tGame Locked :(. Player {idx:d} wins!!!!' )
+
+        rates = [[self.players[0].MMR], [self.players[1].MMR], [self.players[2].MMR], [self.players[3].MMR]]
+        ranks = [1] * 4
+        ranks[idx] = 0
+
+        (r1,), (r2,), (r3,), (r4,) = rate(rates, ranks=ranks)
+
+        self.players[0].MMR = dpc(r1)
+        self.players[1].MMR = dpc(r2)
+        self.players[2].MMR = dpc(r3)
+        self.players[3].MMR = dpc(r4)
+
+        return idx, locked
 
 
 game = Game(6,4)
-nGames = 500
+nGames = 1500
+wins = [0,0,0,0]
+winsL = [0,0,0,0]
+
 for i in range(nGames) :
     print(f'Game {(i+1):d}')
-    game.play()
+    idxWin, locked = game.play()
+    if locked : winsL[idxWin] += 1
+    else: wins[idxWin] += 1
     for p in game.players : print( '\t' + p.printMMR() )
+
+print()
+for i,(w,l) in enumerate( zip(wins,winsL) ) : print(f'Player {i:d} wins {w:d} games and wins {l:d} locked games. Total wins: {w+l:d}')
