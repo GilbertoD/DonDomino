@@ -228,9 +228,11 @@ class Game:
 
         self.bones = list( combinations( numbers, 2 ) )
         for i in numbers: self.bones.append((i, i))
+        rnd.shuffle(self.bones)
 
         jugIdx = [ i % self.nJug for i in range( len( self.bones ) ) ]
         rnd.shuffle( jugIdx )
+
         for bone, id in zip( self.bones, jugIdx ):
             b = Bone( bone[0], bone[1] )
             self.players[id].addBone( b )
@@ -317,7 +319,7 @@ class Game:
 
 
 game = Game(6,4)
-nGames = 1500
+nGames = 2500
 wins = [0,0,0,0]
 winsL = [0,0,0,0]
 
