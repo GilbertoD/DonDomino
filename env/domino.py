@@ -304,6 +304,7 @@ class Game:
 
             print( f'\tGame Locked :(. Player {idx:d} wins!!!!' )
 
+
         rates = [[self.players[0].MMR], [self.players[1].MMR], [self.players[2].MMR], [self.players[3].MMR]]
         ranks = [1] * 4
         ranks[idx] = 0
@@ -319,7 +320,7 @@ class Game:
 
 
 game = Game(6,4)
-nGames = 2500
+nGames = 1000
 wins = [0,0,0,0]
 winsL = [0,0,0,0]
 
