@@ -6,6 +6,7 @@ from enum import Enum
 import numpy as np
 import tensorflow as tf
 from supervised_model.Main_supervisado import build_model
+import string
 
 DEBUG = False
 
@@ -50,15 +51,21 @@ class PlayerType(Enum) :
         if self == PlayerType.IMITATION: return 'Imitation Bot Player'
 
 class Player:
-    def __init__(self, id: int, nMax: int, nTotalBones: int, typeAgent):
-        self.id = id
+    def __init__(self, name, typeAgent):
+        self.name = name
+
+        self.wins = 0
+        self.lockedWins = 0
+        self.games = 0
+
+        self.id = 0
         self.bones = []
         self.initialBones = []
 
         self.MMR = Rating()
 
-        self.nMax = nMax
-        self.nTotal = nTotalBones
+        self.nMax = 6
+        self.nTotal = 28
 
         self.typeAgent = PlayerType(typeAgent)
 
@@ -76,6 +83,14 @@ class Player:
         self.model = build_model((91, 1,),type="fc")
         self.model.load_weights("./models/DOMINATOR_e31-val_loss_2.2780.hdf5")
 
+    def printInfo(self):
+        w,l,g = self.wins, self.lockedWins, self.games
+        WR = f'{100*( w + l )/g:.3f} %' if g > 0 else 'X %'
+        mu, sigma = self.MMR.mu, self.MMR.sigma
+        print(f'Player {self.name} : \n'
+              f'\tType: {str(self.typeAgent)}\n'
+              f'\tWin Rate: {w:d} games and {l:d} locked games. Total wins: {w + l:d}. Total Games: {g:d}. WR: {WR}.\n'
+              f'\tMMR: ( {mu:.3f}, {sigma:.3f} ) --> {mu-3*sigma:.3f}')
 
     def __str__(self):
         s = f'Player {self.id:d}:\n\t'
@@ -84,7 +99,12 @@ class Player:
         return s
 
     def printMMR(self):
-        return f'Player {self.id:d} ({str(self.typeAgent)}): ' + str( self.MMR )
+        mu, sigma = self.MMR.mu, self.MMR.sigma
+        return f'Player {self.name} ({str(self.typeAgent)}): ( {mu:.3f}, {sigma:.3f} ) --> {mu-3*sigma:.3f}'
+
+    def value_MMR(self):
+        mu, sigma = self.MMR.mu, self.MMR.sigma
+        return mu - 3*sigma
 
     def playerId(self, otherID:int ):
         tempID = otherID - self.id
@@ -205,23 +225,14 @@ class Player:
 
 
 class Game:
-    def __init__(self, nMax: int, nJug: int):
-        self.nMax = nMax
-        self.totalBones = self.nTotalBones()
-        assert self.nTotalBones() % nJug == 0, "Bones cannot be deal!!!"
-        self.nJug = nJug
-
-        nBones = int(self.nTotalBones() / nJug)
-        types = [1,0,0,0]
-        self.players = [ Player(i, nMax, self.totalBones, types[i]) for i in range(nJug) ]
-
+    def __init__(self):
         self.board = []
         self.bones = []
 
+        self.players = []
 
-    def nTotalBones(self) -> int:
-        n = self.nMax
-        return int(0.5 * (n + 1) * (n + 2))
+        self.nMax = 6
+        self.nJug = 4
 
     def deal(self):
         numbers = range(self.nMax + 1)
@@ -250,8 +261,11 @@ class Game:
         for b in self.board: s += str( b ) + "  "
         print(s + "\n")
 
-    def play(self):
+    def play(self, players):
         self.reset()
+
+        self.players = players
+        for i,p in enumerate(players) : p.id = i
 
         self.deal()
         ended = False
@@ -290,7 +304,8 @@ class Game:
         idx = (idx - 1) % self.nJug
         locked = True
         if nPass < self.nJug :
-            print(f'\tPlayer {idx:d} wins!!!!')
+            print(f'\tPlayer {idx:d} ({self.players[idx].name}) wins!!!!')
+            self.players[idx].wins += 1
 
             locked = False
         else :
@@ -302,8 +317,10 @@ class Game:
 
             locked = True
 
-            print( f'\tGame Locked :(. Player {idx:d} wins!!!!' )
+            print( f'\tGame Locked :(. Player {idx:d} ({self.players[idx].name}) wins!!!!' )
+            self.players[idx].lockedWins += 1
 
+        for p in self.players : p.games += 1
 
         rates = [[self.players[0].MMR], [self.players[1].MMR], [self.players[2].MMR], [self.players[3].MMR]]
         ranks = [1] * 4
@@ -318,18 +335,30 @@ class Game:
 
         return idx, locked
 
+nPlayers = 8
+names = list( string.ascii_uppercase[:nPlayers] )
+players = []
+types = [0,0,0,0,1,1,1,1]
+for n,t in zip( names, types ) :
+    players.append( Player(n,t) )
 
-game = Game(6,4)
+game = Game()
 nGames = 1000
-wins = [0,0,0,0]
-winsL = [0,0,0,0]
 
 for i in range(nGames) :
-    print(f'Game {(i+1):d}')
-    idxWin, locked = game.play()
-    if locked : winsL[idxWin] += 1
-    else: wins[idxWin] += 1
-    for p in game.players : print( '\t' + p.printMMR() )
+    idx = list( range(nPlayers) )
+    rnd.shuffle( idx )
+    idx = idx[:4]
+    tempPlayers = [ players[i] for i in idx ]
+
+    s = ''
+    for p in tempPlayers: s += p.name + " "
+    print(f'Game {(i+1):d} | Players: {s}')
+
+    idxWin, locked = game.play( tempPlayers )
+    for p in game.players : print( '\t\t' + p.printMMR() )
 
 print()
-for i,(w,l) in enumerate( zip(wins,winsL) ) : print(f'Player {i:d} wins {w:d} games and wins {l:d} locked games. Total wins: {w+l:d}')
+
+players.sort( key= lambda x : x.value_MMR(), reverse=True )
+for p in players : p.printInfo()
